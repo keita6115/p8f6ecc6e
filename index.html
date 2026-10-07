@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>&#8203;</title>
+<style>
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f4f3ef;color:#141414;font:15px/1.6 "Hiragino Sans","Noto Sans JP",sans-serif;padding:16px}
+form{width:100%;max-width:360px;display:grid;gap:12px}h1{font-size:18px;margin:0 0 4px}
+input{height:48px;padding:0 12px;font:inherit;border:1px solid #888;background:#fff}button{height:48px;font:inherit;font-weight:700;border:0;background:#141414;color:#fff;cursor:pointer}
+p{margin:0;min-height:1.6em;font-size:13px;color:#b00}
+</style></head><body>
+<form id="f"><label for="pw">パスワード</label><input id="pw" type="password" autocomplete="current-password" required autofocus><button>開く</button><p id="m" role="status"></p></form>
+<script>
+const m = document.getElementById("m");
+document.getElementById("f").addEventListener("submit", async e => {
+  e.preventDefault(); m.style.color = "#555"; m.textContent = "";
+  try {
+    const buf = new Uint8Array(await (await fetch("data.bin", { cache: "no-store" })).arrayBuffer());
+    const salt = buf.slice(0, 16), iv = buf.slice(16, 28), ct = buf.slice(28);
+    const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(document.getElementById("pw").value.trim()), "PBKDF2", false, ["deriveKey"]);
+    const key = await crypto.subtle.deriveKey({ name: "PBKDF2", salt, iterations: 600000, hash: "SHA-256" }, base, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+    let plain; try { plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ct); } catch { m.style.color = "#b00"; m.textContent = "パスワードが違います。"; return; }
+    const json = await new Response(new Blob([plain]).stream().pipeThrough(new DecompressionStream("gzip"))).text();
+    const files = JSON.parse(json), c = await caches.open("site"), root = new URL("s/", location.href).href;
+    await Promise.all(Object.entries(files).map(([p, [t, b]]) => { const bin = Uint8Array.from(atob(b), x => x.charCodeAt(0)); return c.put(root + p, new Response(bin, { headers: { "Content-Type": t } })); }));
+    await navigator.serviceWorker.register("sw.js"); await navigator.serviceWorker.ready;
+    location.href = "s/index.html";
+  } catch (err) { m.style.color = "#b00"; m.textContent = "開けませんでした。"; }
+});
+</script></body></html>
