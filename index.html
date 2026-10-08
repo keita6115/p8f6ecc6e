@@ -20,7 +20,8 @@ document.getElementById("f").addEventListener("submit", async e => {
     const json = await new Response(new Blob([plain]).stream().pipeThrough(new DecompressionStream("gzip"))).text();
     const files = JSON.parse(json), c = await caches.open("site"), root = new URL("s/", location.href).href;
     await Promise.all(Object.entries(files).map(([p, [t, b]]) => { const bin = Uint8Array.from(atob(b), x => x.charCodeAt(0)); return c.put(root + p, new Response(bin, { headers: { "Content-Type": t } })); }));
-    await navigator.serviceWorker.register("sw.js"); await navigator.serviceWorker.ready;
+    const reg = await navigator.serviceWorker.register("sw.js");
+    await new Promise(ok => { const w = reg.installing || reg.waiting; if (reg.active && !w) return ok(); const t = setTimeout(ok, 6000); (w || reg.active).addEventListener("statechange", e => { if (e.target.state === "activated") { clearTimeout(t); ok(); } }); });
     location.href = "s/index.html";
   } catch (err) { m.style.color = "#b00"; m.textContent = "開けませんでした。"; }
 });
