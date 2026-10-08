@@ -12,7 +12,9 @@ const m = document.getElementById("m");
 document.getElementById("f").addEventListener("submit", async e => {
   e.preventDefault(); m.style.color = "#555"; m.textContent = "";
   try {
-    const buf = new Uint8Array(await (await fetch("data.bin", { cache: "no-store" })).arrayBuffer());
+    const res = await fetch("data.bin"), total = +res.headers.get("content-length") || 0, rd = res.body.getReader(), parts = []; let got = 0;
+    for (;;) { const { done, value } = await rd.read(); if (done) break; parts.push(value); got += value.length; if (total) m.textContent = "読み込み中 " + Math.min(99, Math.round(got / total * 100)) + "%"; }
+    const buf = new Uint8Array(await new Blob(parts).arrayBuffer()); m.textContent = "開いています…";
     const salt = buf.slice(0, 16), iv = buf.slice(16, 28), ct = buf.slice(28);
     const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(document.getElementById("pw").value.trim()), "PBKDF2", false, ["deriveKey"]);
     const key = await crypto.subtle.deriveKey({ name: "PBKDF2", salt, iterations: 600000, hash: "SHA-256" }, base, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
